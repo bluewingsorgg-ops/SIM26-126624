@@ -1,67 +1,93 @@
 <?php
-$environment = getenv('APP_ENV') ?: 'unknown';
-$dbHost = getenv('DB_HOST') ?: 'db';
-$dbPort = getenv('DB_PORT') ?: '3306';
-$dbName = getenv('DB_NAME') ?: '';
-$dbUser = getenv('DB_USER') ?: '';
-$dbPass = getenv('DB_PASSWORD') ?: '';
 
-$connected = false;
-$error = null;
-$version = null;
-$items = [];
-
-try {
-    $dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
-    $pdo = new PDO($dsn, $dbUser, $dbPass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
-
-    $connected = true;
-    $version = $pdo->query('SELECT VERSION()')->fetchColumn();
-    $items = $pdo->query('SELECT id, label FROM demo_items ORDER BY id')->fetchAll();
-} catch (Throwable $e) {
-    $error = $e->getMessage();
+if (!isset($_SESSION['catalogo'])) {
+    $_SESSION['catalogo'] = [
+        1 => ['modelo' => 'Canon EOS R6 Mark II', 'tipo' => 'Mirrorless', 'preco' => 2499.00, 'stock' => 4],
+        2 => ['modelo' => 'Sony Alpha A7 IV', 'tipo' => 'Mirrorless', 'preco' => 2650.00, 'stock' => 2],
+        3 => ['modelo' => 'Nikon D850', 'tipo' => 'DSLR', 'preco' => 2100.00, 'stock' => 5],
+        4 => ['modelo' => 'Fujifilm X100VI', 'tipo' => 'Compacta', 'preco' => 1799.00, 'stock' => 1],
+        5 => ['modelo' => 'Pentax K1000', 'tipo' => 'Analógica', 'preco' => 320.00, 'stock' => 0],
+    ];
 }
+
+$mensagem = "";
+
+if (isset($_POST['comprar_id'])) {
+    $id = (int) $_POST['comprar_id'];
+
+    if (isset($_SESSION['catalogo'][$id])) {
+        if ($_SESSION['catalogo'][$id]['stock'] > 0) {
+            $_SESSION['catalogo'][$id]['stock']--;
+            $modelo = $_SESSION['catalogo'][$id]['modelo'];
+            $mensagem = "<p style='color: green;'><strong> Encomenda registada:</strong> Compraste uma {$modelo}!</p>";
+        } else {
+            $mensagem = "<p style='color: red;'><strong> Esgotado:</strong> Esta câmara já não tem stock.</p>";
+        }
+    }
+}
+
+if (isset($_POST['reset_stock'])) {
+    unset($_SESSION['catalogo']);
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+$filtro_tipo = $_GET['tipo'] ?? 'Todos';
 ?>
-<!doctype html>
-<html lang="en">
+
+<!DOCTYPE html>
+<html lang="pt">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PHP Codespaces Compose demo</title>
+    <meta charset="UTF-8">
+    <title>Loja de Cameras</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 850px; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
-        code { background: #eee; padding: .15rem .35rem; border-radius: .25rem; }
-        .ok { color: #18794e; }
-        .bad { color: #b42318; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 30px auto; padding: 0 15px; background: #f4f4f9; }
+        .card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        button { padding: 8px 14px; cursor: pointer; background: #000000; color: white; border: none; border-radius: 4px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .filtros { margin-bottom: 20px; }
     </style>
 </head>
 <body>
-    <h1>PHP + MariaDB in Codespaces</h1>
-    <p>Environment: <strong><?= htmlspecialchars($environment) ?></strong></p>
-    <p>PHP: <strong><?= htmlspecialchars(PHP_VERSION) ?></strong></p>
 
-    <?php if ($connected): ?>
-        <p class="ok">Database connection: <strong>OK</strong></p>
-        <p>MariaDB/MySQL server: <strong><?= htmlspecialchars((string)$version) ?></strong></p>
-        <p>PHP connects to the database using <code>db:3306</code>.</p>
-        <h2>Seed data</h2>
-        <ul>
-            <?php foreach ($items as $item): ?>
-                <li><?= (int)$item['id'] ?> — <?= htmlspecialchars($item['label']) ?></li>
-            <?php endforeach; ?>
-        </ul>
-    <?php else: ?>
-        <p class="bad">Database connection: <strong>FAILED</strong></p>
-        <pre><?= htmlspecialchars((string)$error) ?></pre>
-    <?php endif; ?>
+    <h1>Equipamento Fotográfico</h1>
+    <p>Painel de vendas e controlo de stock em tempo real.</p>
 
-    <?php if ($environment === 'teaching'): ?>
-        <p>Teaching mode also starts phpMyAdmin on the forwarded <strong>8081</strong> port.</p>
-    <?php elseif ($environment === 'development'): ?>
-        <p>Development mode enables Xdebug and the VS Code PHP Debug extension.</p>
-    <?php endif; ?>
+    <?= $mensagem ?>
+
+    <div class="filtros">
+        <strong>Filtrar por categoria:</strong>
+        <a href="?tipo=Todos">Todos</a> |
+        <a href="?tipo=Mirrorless">Mirrorless</a> |
+        <a href="?tipo=DSLR">DSLR</a> |
+        <a href="?tipo=Compacta">Compacta</a> |
+        <a href="?tipo=Analógica">Analógica</a>
+    </div>
+
+    <?php foreach ($_SESSION['catalogo'] as $id => $camara): ?>
+        <?php 
+            if ($filtro_tipo !== 'Todos' && $camara['tipo'] !== $filtro_tipo) continue; 
+        ?>
+        <div class="card">
+            <div>
+                <h3><?= $camara['modelo'] ?> <small>(<?= $camara['tipo'] ?>)</small></h3>
+                <p>Preço: <strong><?= number_format($camara['preco'], 2, ',', '.') ?> €</strong> | 
+                   Stock: <strong><?= $camara['stock'] ?> un.</strong></p>
+            </div>
+
+            <form method="POST">
+                <input type="hidden" name="comprar_id" value="<?= $id ?>">
+                <button type="submit" <?= $camara['stock'] === 0 ? 'disabled' : '' ?>>
+                    <?= $camara['stock'] > 0 ? 'Comprar' : 'Esgotado' ?>
+                </button>
+            </form>
+        </div>
+    <?php endforeach; ?>
+
+    <hr>
+    <form method="POST">
+        <button type="submit" name="reset_stock" style="background: #555;">Repor Stock Inicial</button>
+    </form>
+
 </body>
 </html>
